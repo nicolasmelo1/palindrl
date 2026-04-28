@@ -422,7 +422,6 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
         mismatch = left_char != right_char
         pointers_crossed = self._left >= self._right
         current_pair = (self._left, self._right)
-        can_attempt_answer = self._has_compared and (self._mismatch_observed or pointers_crossed)
 
         can_compare = self._last_compared_pair != current_pair
         can_move = (
@@ -431,8 +430,11 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
             and self._ready_to_move
             and self._last_compared_pair == current_pair
         )
-        can_answer_pal = can_attempt_answer
-        can_answer_not = can_attempt_answer
+        # Once enough evidence exists, make terminal actions logically strict:
+        # - observed mismatch => only NOT palindrome
+        # - pointers crossed without mismatch => only palindrome
+        can_answer_pal = self._has_compared and pointers_crossed and not self._mismatch_observed
+        can_answer_not = self._has_compared and self._mismatch_observed
         return np.array(
             [can_compare, can_move, can_answer_pal, can_answer_not],
             dtype=np.int32,
