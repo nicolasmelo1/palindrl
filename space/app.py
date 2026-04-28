@@ -17,7 +17,7 @@ from palindrl.play import build_env_kwargs, prepare_model_input  # noqa: E402
 
 
 CHECKPOINT_PATH = ROOT / "checkpoints" / "policy.pt"
-LOGO_PATH = ROOT / "static" / "palindromon-logo.png"
+LOGO_URL = "/gradio_api/file=static/palindromon-logo.png"
 
 
 def load_model() -> tuple[TinyTransformerPolicy, TinyTransformerConfig, dict]:
@@ -93,13 +93,16 @@ def predict(message: str, history: list[dict[str, str]] | None = None) -> str:
 
 
 with gr.Blocks(title="palindromon-0.116M") as demo:
-    gr.Image(
-        value=str(LOGO_PATH),
-        show_label=False,
-        show_download_button=False,
-        show_fullscreen_button=False,
-        container=False,
-        height=220,
+    gr.HTML(
+        f"""
+        <div style="display:flex; justify-content:center; margin: 16px 0;">
+          <img
+            src="{LOGO_URL}"
+            alt="palindromon logo"
+            style="max-height:220px; max-width:100%; object-fit:contain;"
+          />
+        </div>
+        """
     )
     gr.ChatInterface(
         fn=predict,
