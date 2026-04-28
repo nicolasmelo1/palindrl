@@ -42,7 +42,7 @@ def strip_accents(text: str) -> str:
 def predict(message: str, history: list[dict[str, str]] | None = None) -> str:
     text = strip_accents(message).strip()
     if not text:
-        return "False"
+        return "Is not Palindrome ):"
 
     try:
         env_kwargs = build_env_kwargs(
@@ -53,7 +53,7 @@ def predict(message: str, history: list[dict[str, str]] | None = None) -> str:
         env = RandomPalindromeEnv(**env_kwargs)
         obs, _ = env.reset(options={"text": text})
     except Exception:
-        return "False"
+        return "something happened, don't know"
 
     last_action_name = ""
     last_info = None
@@ -82,9 +82,9 @@ def predict(message: str, history: list[dict[str, str]] | None = None) -> str:
         env.close()
 
     if not last_info or not last_info.get("answered", False):
-        return "False"
+        return "Is not Palindrome ):"
 
-    return "True" if last_action_name == "ANSWER_PALINDROME" else "False"
+    return "Is Palindrome :)" if last_action_name == "ANSWER_PALINDROME" else "Is not Palindrome ):"
 
 
 demo = gr.ChatInterface(
