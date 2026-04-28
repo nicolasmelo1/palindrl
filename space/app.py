@@ -17,6 +17,7 @@ from palindrl.play import build_env_kwargs, prepare_model_input  # noqa: E402
 
 
 CHECKPOINT_PATH = ROOT / "checkpoints" / "policy.pt"
+LOGO_PATH = ROOT / "static" / "palindromon-logo.png"
 
 
 def load_model() -> tuple[TinyTransformerPolicy, TinyTransformerConfig, dict]:
@@ -91,21 +92,30 @@ def predict(message: str, history: list[dict[str, str]] | None = None) -> str:
     )
 
 
-demo = gr.ChatInterface(
-    fn=predict,
-    title="palindromon-0.116M",
-    description="Send text. It answers whether the text is a palindrome.",
-    examples=[
-        "This is an example",
-        "Anotaram a data da maratona",
-        "A cara rajada da jararaca",
-        "Roma me tem amor",
-        "A base do teto desaba",
-        "racecar",
-        "A man, a plan, a canal: Panama!",
-        "not a palindrome",
-    ],
-)
+with gr.Blocks(title="palindromon-0.116M") as demo:
+    gr.Image(
+        value=str(LOGO_PATH),
+        show_label=False,
+        show_download_button=False,
+        show_fullscreen_button=False,
+        container=False,
+        height=220,
+    )
+    gr.ChatInterface(
+        fn=predict,
+        title="palindromon-0.116M",
+        description="Send text. It answers whether the text is a palindrome.",
+        examples=[
+            "This is an example",
+            "Anotaram a data da maratona",
+            "A cara rajada da jararaca",
+            "Roma me tem amor",
+            "A base do teto desaba",
+            "racecar",
+            "A man, a plan, a canal: Panama!",
+            "not a palindrome",
+        ],
+    )
 
 
 if __name__ == "__main__":
