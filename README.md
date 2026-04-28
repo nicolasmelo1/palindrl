@@ -1,4 +1,58 @@
-# palindrl
+# palindromon-0.116M
+
+> This is dumb and should not be taken seriously.
+>
+> This model card contains intentionally fake, unserious benchmark comparisons.
+> Do not cite this as an evaluation, do not use it for decisions, and do not
+> confuse it with a real SOTA claim.
+
+`palindromon-0.116M` is a tiny reinforcement-learning policy that performs one
+extremely important task: deciding whether short strings are palindromes by
+walking two pointers inward.
+
+It has **116,101 parameters**, which rounds to **0.116M** if you are feeling
+generous. It is a decoder-only transformer with a policy head, a value head, and
+the confidence of a much larger model.
+
+## Model Details
+
+- **Architecture:** tiny decoder-only transformer policy/value network
+- **Parameters:** 116,101
+- **Task:** procedural palindrome classification
+- **Training:** PPO in a custom Gymnasium environment
+- **Default checkpoint:** `checkpoints/policy.pt`
+- **Action space:**
+  - `COMPARE`
+  - `MOVE_INWARD`
+  - `ANSWER_PALINDROME`
+  - `ANSWER_NOT_PALINDROME`
+
+## Completely Fake Benchmarks
+
+These numbers are jokes. They were not produced by a real benchmark suite.
+
+| Model | Params | Palindrome Arena Elo | Vibes / Watt | Strategic Pointer Depth | Notes |
+| --- | ---: | ---: | ---: | ---: | --- |
+| palindromon-0.116M | 0.116M | 9001 | extremely high | 2 pointers | Knows what it is here to do. |
+| GPT-5.5 | undisclosed | 8999 | strong | overthinks | May write a sonnet before answering. |
+| Claude Opus 4.7 | undisclosed | 8998 | elegant | reflective | Politely asks whether symmetry has meaning. |
+| Qwen-3.6 | undisclosed | 8997 | efficient | multilingual | Strong, but fewer dumb branding points. |
+| Random baseline | 0 | 50 | unbeatable | none | Sometimes correct, often with conviction. |
+
+## Intended Use
+
+Use this to test the local palindrome RL scaffold, upload a tiny model to
+Hugging Face, or make a toy demo that should absolutely not be confused for a
+serious language model.
+
+## Limitations
+
+- It only knows the palindrome environment.
+- It can fail out of distribution.
+- It is not a general-purpose model.
+- The benchmark table above is fake.
+
+## Original Project
 
 Tiny scaffold for a palindrome RL agent with:
 - OpenAI GPT-2 BPE tokenizer utilities
