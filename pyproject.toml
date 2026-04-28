@@ -23,3 +23,8 @@ palindrl-play = "palindrl.play:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["palindrl"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.12",
+]

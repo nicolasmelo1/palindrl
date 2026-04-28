@@ -54,7 +54,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="OpenAI BPE tokenizer helpers")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    download_parser = subparsers.add_parser("download", help="Download OpenAI GPT-2 BPE assets")
+    download_parser = subparsers.add_parser(
+        "download", help="Download OpenAI GPT-2 BPE assets"
+    )
     download_parser.add_argument(
         "--out-dir",
         type=Path,
@@ -67,10 +69,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Re-download even if files exist.",
     )
 
-    encode_parser = subparsers.add_parser("encode", help="Encode text with OpenAI GPT-2 BPE")
+    encode_parser = subparsers.add_parser(
+        "encode", help="Encode text with OpenAI GPT-2 BPE"
+    )
     encode_parser.add_argument("text", type=str)
 
-    decode_parser = subparsers.add_parser("decode", help="Decode comma-separated token IDs")
+    decode_parser = subparsers.add_parser(
+        "decode", help="Decode comma-separated token IDs"
+    )
     decode_parser.add_argument("tokens", type=str, help='Example: "123,456,789"')
 
     return parser
@@ -95,7 +101,9 @@ def main() -> None:
         print(json.dumps(tokenizer.encode(args.text)))
         return
 
-    token_ids = [int(token.strip()) for token in args.tokens.split(",") if token.strip()]
+    token_ids = [
+        int(token.strip()) for token in args.tokens.split(",") if token.strip()
+    ]
     print(tokenizer.decode(token_ids))
 
 

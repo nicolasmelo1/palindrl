@@ -84,7 +84,11 @@ def predict(message: str, history: list[dict[str, str]] | None = None) -> str:
     if not last_info or not last_info.get("answered", False):
         return "Is not Palindrome ):"
 
-    return "Is Palindrome :)" if last_action_name == "ANSWER_PALINDROME" else "Is not Palindrome ):"
+    return (
+        "Is Palindrome :)"
+        if last_action_name == "ANSWER_PALINDROME"
+        else "Is not Palindrome ):"
+    )
 
 
 demo = gr.ChatInterface(

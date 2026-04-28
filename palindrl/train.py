@@ -127,7 +127,9 @@ def collect_rollout_batch(
         if running_episode_len == 0:
             next_value = torch.zeros((), dtype=torch.float32, device=device)
         else:
-            last_input_ids = torch.tensor(obs["input_ids"], dtype=torch.long, device=device)
+            last_input_ids = torch.tensor(
+                obs["input_ids"], dtype=torch.long, device=device
+            )
             next_value = model(last_input_ids.unsqueeze(0)).state_value.squeeze(0)
 
     values = torch.stack(values_list, dim=0)
@@ -150,10 +152,14 @@ def collect_rollout_batch(
 
     returns = advantages + values
     if normalize_advantages:
-        advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
+        advantages = (advantages - advantages.mean()) / (
+            advantages.std(unbiased=False) + 1e-8
+        )
 
     mean_episode_return = (
-        sum(episode_returns) / len(episode_returns) if episode_returns else float(rewards.mean().item())
+        sum(episode_returns) / len(episode_returns)
+        if episode_returns
+        else float(rewards.mean().item())
     )
     mean_episode_len = (
         sum(episode_lens) / len(episode_lens) if episode_lens else float(rollout_steps)
@@ -181,6 +187,63 @@ def collect_rollout_batch(
         repeat_compare_rate=repeat_compare_rate,
         episodes_finished=episodes_finished,
     )
+
+
+def print_debug_rollouts(
+    env: RandomPalindromeEnv,
+    model: TinyTransformerPolicy,
+    device: torch.device,
+    episodes: int,
+) -> None:
+    model.eval()
+    for episode_idx in range(1, episodes + 1):
+        obs, info = env.reset()
+        total_reward = 0.0
+        print(
+            f"debug episode {episode_idx}: "
+            f"text={info['text']!r} norm={info['normalized_text']!r} "
+            f"label={'palindrome' if info['is_palindrome'] else 'not palindrome'}"
+        )
+
+        for step_idx in range(1, env.max_steps + 1):
+            input_ids = torch.tensor(obs["input_ids"], dtype=torch.long, device=device)
+            action_mask = torch.tensor(
+                obs["action_mask"], dtype=torch.bool, device=device
+            )
+
+            with torch.no_grad():
+                output = model(input_ids.unsqueeze(0))
+                logits = output.action_logits.squeeze(0)
+                masked_logits = logits.masked_fill(~action_mask, -1e9)
+                action = int(torch.argmax(masked_logits, dim=-1).item())
+
+            obs, reward, terminated, truncated, step_info = env.step(action)
+            total_reward += float(reward)
+            print(
+                f"  {step_idx:02d} {step_info['action_name']:<20} "
+                f"L={step_info['left']}({step_info['left_char']}) "
+                f"R={step_info['right']}({step_info['right_char']}) "
+                f"reward={reward:+.3f}"
+            )
+
+            if terminated or truncated:
+                break
+
+        answered = bool(step_info.get("answered", False))
+        if answered:
+            predicted = (
+                "palindrome"
+                if step_info["action_name"] == "ANSWER_PALINDROME"
+                else "not palindrome"
+            )
+            correct = step_info.get("final_correct")
+        else:
+            predicted = "unknown"
+            correct = None
+        print(
+            f"  result predicted={predicted} correct={correct} "
+            f"total_reward={total_reward:.3f} steps={step_info['steps']}"
+        )
 
 
 def ppo_update(
@@ -213,7 +276,9 @@ def ppo_update(
             idx = permutation[start : start + minibatch_size]
 
             output = model(batch.input_ids[idx])
-            masked_logits = output.action_logits.masked_fill(~batch.action_masks[idx], -1e9)
+            masked_logits = output.action_logits.masked_fill(
+                ~batch.action_masks[idx], -1e9
+            )
             dist = Categorical(logits=masked_logits)
             new_logprobs = dist.log_prob(batch.actions[idx])
             entropy = dist.entropy().mean()
@@ -221,7 +286,10 @@ def ppo_update(
 
             ratios = torch.exp(new_logprobs - batch.old_logprobs[idx])
             unclipped = ratios * batch.advantages[idx]
-            clipped = torch.clamp(ratios, 1.0 - clip_eps, 1.0 + clip_eps) * batch.advantages[idx]
+            clipped = (
+                torch.clamp(ratios, 1.0 - clip_eps, 1.0 + clip_eps)
+                * batch.advantages[idx]
+            )
             policy_loss = -torch.min(unclipped, clipped).mean()
             value_loss = F.mse_loss(values, batch.returns[idx])
             total_loss = policy_loss + value_coef * value_loss - entropy_coef * entropy
@@ -280,6 +348,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--log-dir", type=Path, default=Path("runs/palindrl"))
     parser.add_argument("--log-every", type=int, default=10)
+    parser.add_argument(
+        "--debug-rollouts",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Print greedy model episodes during training.",
+    )
+    parser.add_argument(
+        "--debug-rollout-every",
+        type=int,
+        default=10,
+        help="When --debug-rollouts is enabled, print traces every N PPO updates.",
+    )
+    parser.add_argument(
+        "--debug-rollout-episodes",
+        type=int,
+        default=1,
+        help="Number of episodes to print for each debug rollout.",
+    )
 
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--gae-lambda", type=float, default=0.95)
@@ -289,7 +375,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--value-coef", type=float, default=0.5)
     parser.add_argument("--entropy-coef", type=float, default=0.001)
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
-    parser.add_argument("--no-adv-norm", action="store_true", help="Disable adv normalization")
+    parser.add_argument(
+        "--no-adv-norm", action="store_true", help="Disable adv normalization"
+    )
 
     parser.add_argument("--vocab-size", type=int, default=None)
     parser.add_argument("--max-seq-len", type=int, default=64)
@@ -407,7 +495,9 @@ def main() -> None:
 
     if args.init_checkpoint is not None:
         if not args.init_checkpoint.exists():
-            raise FileNotFoundError(f"init checkpoint not found: {args.init_checkpoint}")
+            raise FileNotFoundError(
+                f"init checkpoint not found: {args.init_checkpoint}"
+            )
         init_ckpt = torch.load(args.init_checkpoint, map_location=device)
         model.load_state_dict(init_ckpt["state_dict"])
         loaded_optimizer = False
@@ -423,6 +513,16 @@ def main() -> None:
     writer = SummaryWriter(log_dir=str(args.log_dir))
 
     for step in range(1, args.steps + 1):
+        if args.debug_rollouts and (
+            step == 1 or step % args.debug_rollout_every == 0 or step == args.steps
+        ):
+            print_debug_rollouts(
+                env=env,
+                model=model,
+                device=device,
+                episodes=args.debug_rollout_episodes,
+            )
+
         batch = collect_rollout_batch(
             env=env,
             model=model,

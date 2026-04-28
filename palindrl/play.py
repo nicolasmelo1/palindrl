@@ -49,7 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def build_env_kwargs(env_config: dict, text: str, ignored_chars_override: str | None) -> dict:
+def build_env_kwargs(
+    env_config: dict, text: str, ignored_chars_override: str | None
+) -> dict:
     signature = inspect.signature(RandomPalindromeEnv.__init__)
     kwargs: dict = {}
     for name, parameter in signature.parameters.items():
@@ -88,10 +90,16 @@ def prepare_model_input(
     oov = input_ids_np >= int(vocab_size)
     if np.any(oov):
         input_ids_np[oov] = 0
-    input_ids = torch.from_numpy(input_ids_np).unsqueeze(0).to(device=device, dtype=torch.long)
+    input_ids = (
+        torch.from_numpy(input_ids_np).unsqueeze(0).to(device=device, dtype=torch.long)
+    )
 
     action_mask_np = obs["action_mask"].astype(np.bool_, copy=False)
-    action_mask = torch.from_numpy(action_mask_np).unsqueeze(0).to(device=device, dtype=torch.bool)
+    action_mask = (
+        torch.from_numpy(action_mask_np)
+        .unsqueeze(0)
+        .to(device=device, dtype=torch.bool)
+    )
     return input_ids, action_mask
 
 
@@ -182,7 +190,11 @@ def main() -> None:
 
     answered = bool(last_info.get("answered", False))
     if answered:
-        predicted = "palindrome" if last_action_name == "ANSWER_PALINDROME" else "not palindrome"
+        predicted = (
+            "palindrome"
+            if last_action_name == "ANSWER_PALINDROME"
+            else "not palindrome"
+        )
         correct = last_info.get("final_correct")
     else:
         predicted = "unknown (no terminal answer)"
@@ -190,7 +202,9 @@ def main() -> None:
 
     print("Result:")
     print(f"- predicted: {predicted}")
-    print(f"- ground_truth: {'palindrome' if last_info['is_palindrome'] else 'not palindrome'}")
+    print(
+        f"- ground_truth: {'palindrome' if last_info['is_palindrome'] else 'not palindrome'}"
+    )
     print(f"- correct: {correct}")
     print(f"- total_reward: {total_reward:.3f}")
     print(f"- steps: {last_info['steps']}")

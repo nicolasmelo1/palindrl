@@ -1,35 +1,56 @@
 from __future__ import annotations
 
 import string
+from dataclasses import dataclass
+from enum import IntEnum
 from typing import Any
 
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-ACTION_COMPARE = 0
-ACTION_MOVE_INWARD = 1
-ACTION_ANSWER_PALINDROME = 2
-ACTION_ANSWER_NOT_PALINDROME = 3
-ACTION_NAMES = [
-    "COMPARE",
-    "MOVE_INWARD",
-    "ANSWER_PALINDROME",
-    "ANSWER_NOT_PALINDROME",
-]
 
-_OBS_CHARSET = "".join(
-    dict.fromkeys(
-        string.ascii_letters + string.digits + string.punctuation + " |="
-    )
+class Action(IntEnum):
+    COMPARE = 0
+    MOVE_INWARD = 1
+    ANSWER_PALINDROME = 2
+    ANSWER_NOT_PALINDROME = 3
+
+
+ACTION_COMPARE = int(Action.COMPARE)
+ACTION_MOVE_INWARD = int(Action.MOVE_INWARD)
+ACTION_ANSWER_PALINDROME = int(Action.ANSWER_PALINDROME)
+ACTION_ANSWER_NOT_PALINDROME = int(Action.ANSWER_NOT_PALINDROME)
+ACTION_NAMES = [action.name for action in Action]
+
+OBSERVATION_CHARS = "".join(
+    dict.fromkeys(string.ascii_letters + string.digits + string.punctuation + " |=")
 )
 
 
-def build_observation_vocab() -> dict[str, int]:
+def build_char_vocab() -> dict[str, int]:
     char_to_id = {"<pad>": 0}
-    for idx, ch in enumerate(_OBS_CHARSET, start=1):
+    for idx, ch in enumerate(OBSERVATION_CHARS, start=1):
         char_to_id[ch] = idx
     return char_to_id
+
+
+def build_observation_vocab() -> dict[str, int]:
+    return build_char_vocab()
+
+
+@dataclass
+class EnvState:
+    text: str = ""
+    normalized_text: str = ""
+    is_palindrome: bool = False
+    left: int = 0
+    right: int = 0
+    steps: int = 0
+    mismatch_observed: bool = False
+    has_compared: bool = False
+    ready_to_move: bool = False
+    last_compared_pair: tuple[int, int] | None = None
 
 
 def normalize_text(text: str, ignored_characters: set[str]) -> str:
@@ -90,12 +111,15 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
         if not 0.0 <= space_probability <= 1.0:
             raise ValueError("space_probability must be between 0 and 1")
 
+        # Sampling config.
         self.min_len = min_len
         self.max_len = max_len
         self.palindrome_probability = palindrome_probability
         self.balanced_sampling = balanced_sampling
         self.space_probability = space_probability
         self.separator_chars = "".join(dict.fromkeys(separator_chars))
+
+        # Normalization config.
         self.ignore_spaces_for_label = ignore_spaces_for_label
         self.case_sensitive = case_sensitive
         ignored = set(ignored_characters)
@@ -105,6 +129,7 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
             ignored if self.case_sensitive else {ch.casefold() for ch in ignored}
         )
 
+        # Reward config.
         self.final_correct_reward = final_correct_reward
         self.final_incorrect_reward = final_incorrect_reward
         self.invalid_answer_penalty = invalid_answer_penalty
@@ -116,6 +141,7 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
         self.step_penalty = step_penalty
         self.timeout_penalty = timeout_penalty
 
+        # Observation config.
         # Text max length with inserted spaces.
         self.max_text_len = 2 * max_len - 1
         if max_steps is None:
@@ -123,11 +149,11 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
         else:
             self.max_steps = max_steps
 
-        self.char_to_id = build_observation_vocab()
+        self.char_to_id = build_char_vocab()
         self.id_to_char = {idx: char for char, idx in self.char_to_id.items()}
 
         inferred_obs_len = len(
-            f"{'a' * self.max_text_len}|l={self.max_text_len-1}|r={self.max_text_len-1}|lc=a|rc=a"
+            f"{'a' * self.max_text_len}|l={self.max_text_len - 1}|r={self.max_text_len - 1}|lc=a|rc=a"
         )
         self.max_observation_len = (
             max_observation_len if max_observation_len is not None else inferred_obs_len
@@ -161,16 +187,7 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
             }
         )
 
-        self._current_text = ""
-        self._normalized_text = ""
-        self._is_palindrome = False
-        self._left = 0
-        self._right = 0
-        self._step_count = 0
-        self._mismatch_observed = False
-        self._has_compared = False
-        self._ready_to_move = False
-        self._last_compared_pair: tuple[int, int] | None = None
+        self.state = EnvState()
         self._next_sample_palindrome = True
 
     def reset(
@@ -182,37 +199,36 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
         super().reset(seed=seed)
         options = options or {}
 
-        if self.balanced_sampling and self._current_text == "":
+        if self.balanced_sampling and self.state.text == "":
             self._next_sample_palindrome = bool(self.np_random.integers(0, 2))
 
         text_option = options.get("text")
         if text_option is not None:
-            self._current_text = str(text_option)
+            text = str(text_option)
         else:
-            self._current_text = self._sample_text()
-        canonical_text = canonicalize_text(self._current_text, case_sensitive=self.case_sensitive)
-        self._normalized_text = normalize_text(canonical_text, self.ignored_characters)
-        if not self._normalized_text:
+            text = self._sample_text()
+        canonical_text = canonicalize_text(text, case_sensitive=self.case_sensitive)
+        normalized_text = normalize_text(canonical_text, self.ignored_characters)
+        if not normalized_text:
             raise ValueError(
                 "Normalized text is empty after removing ignored characters. "
                 "Provide text with at least one non-ignored character."
             )
-        self._is_palindrome = self._is_palindrome_text(self._normalized_text)
-        self._left = 0
-        self._right = len(self._normalized_text) - 1
-        self._step_count = 0
-        self._mismatch_observed = False
-        self._has_compared = False
-        self._ready_to_move = False
-        self._last_compared_pair = None
+        self.state = EnvState(
+            text=text,
+            normalized_text=normalized_text,
+            is_palindrome=self._is_palindrome_text(normalized_text),
+            left=0,
+            right=len(normalized_text) - 1,
+        )
 
         observation = self._encode_observation()
         info = {
-            "text": self._current_text,
-            "normalized_text": self._normalized_text,
-            "is_palindrome": self._is_palindrome,
-            "left": self._left,
-            "right": self._right,
+            "text": self.state.text,
+            "normalized_text": self.state.normalized_text,
+            "is_palindrome": self.state.is_palindrome,
+            "left": self.state.left,
+            "right": self.state.right,
             "case_sensitive": self.case_sensitive,
         }
         return observation, info
@@ -221,8 +237,11 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
         self, action: int
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         if not self.action_space.contains(action):
-            raise ValueError(f"Action {action} is invalid for action space {self.action_space}")
+            raise ValueError(
+                f"Action {action} is invalid for action space {self.action_space}"
+            )
 
+        selected_action = Action(action)
         reward = self.step_penalty
         terminated = False
         truncated = False
@@ -233,103 +252,111 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
         timed_out = False
 
         left_char, right_char = self._current_pointer_chars()
-        mismatch = left_char != right_char
-        pointers_crossed = self._left >= self._right
-        current_pair = (self._left, self._right)
-        can_attempt_answer = self._has_compared and (self._mismatch_observed or pointers_crossed)
 
-        if action == ACTION_COMPARE:
-            if self._last_compared_pair == current_pair:
-                repeat_compare = True
-                invalid_action = True
-                reward += self.repeat_compare_penalty
-            elif pointers_crossed:
-                self._has_compared = True
-                self._last_compared_pair = current_pair
-                self._ready_to_move = False
-            else:
-                self._has_compared = True
-                self._last_compared_pair = current_pair
-                if mismatch:
-                    self._mismatch_observed = True
-                    self._ready_to_move = False
-                    reward += self.compare_mismatch_reward
-                else:
-                    self._ready_to_move = True
-                    reward += self.compare_match_reward
-        elif action == ACTION_MOVE_INWARD:
-            valid_move = (
-                not pointers_crossed
-                and not mismatch
-                and self._ready_to_move
-                and self._last_compared_pair == current_pair
+        if selected_action == Action.COMPARE:
+            reward_delta, invalid_action, repeat_compare = self._handle_compare()
+            reward += reward_delta
+        elif selected_action == Action.MOVE_INWARD:
+            reward_delta, invalid_action = self._handle_move()
+            reward += reward_delta
+        elif selected_action in (
+            Action.ANSWER_PALINDROME,
+            Action.ANSWER_NOT_PALINDROME,
+        ):
+            reward_delta, terminated, answered, final_correct, invalid_action = (
+                self._handle_answer(selected_action)
             )
-            if valid_move:
-                self._left += 1
-                self._right -= 1
-                self._ready_to_move = False
-                self._last_compared_pair = None
-                reward += self.move_valid_reward
-            else:
-                invalid_action = True
-                reward += self.move_invalid_penalty
-        elif action == ACTION_ANSWER_PALINDROME:
-            if not can_attempt_answer:
-                invalid_action = True
-                reward += self.invalid_answer_penalty
-            else:
-                answered = True
-                predicted_palindrome = True
-                final_correct = predicted_palindrome == self._is_palindrome
-                reward += self.final_correct_reward if final_correct else self.final_incorrect_reward
-                terminated = True
-        elif action == ACTION_ANSWER_NOT_PALINDROME:
-            if not can_attempt_answer:
-                invalid_action = True
-                reward += self.invalid_answer_penalty
-            else:
-                answered = True
-                predicted_palindrome = False
-                final_correct = predicted_palindrome == self._is_palindrome
-                reward += self.final_correct_reward if final_correct else self.final_incorrect_reward
-                terminated = True
+            reward += reward_delta
 
-        self._step_count += 1
-        if not terminated and self._step_count >= self.max_steps:
+        self.state.steps += 1
+        if not terminated and self.state.steps >= self.max_steps:
             truncated = True
             timed_out = True
             reward += self.timeout_penalty
 
         observation = self._encode_observation()
         info = {
-            "text": self._current_text,
-            "normalized_text": self._normalized_text,
-            "is_palindrome": self._is_palindrome,
-            "left": self._left,
-            "right": self._right,
+            "text": self.state.text,
+            "normalized_text": self.state.normalized_text,
+            "is_palindrome": self.state.is_palindrome,
+            "left": self.state.left,
+            "right": self.state.right,
             "left_char": left_char,
             "right_char": right_char,
-            "pointers_crossed": self._left >= self._right,
-            "mismatch_observed": self._mismatch_observed,
-            "has_compared": self._has_compared,
-            "ready_to_move": self._ready_to_move,
-            "action_name": ACTION_NAMES[action],
+            "pointers_crossed": self._pointers_crossed(),
+            "mismatch_observed": self.state.mismatch_observed,
+            "has_compared": self.state.has_compared,
+            "ready_to_move": self.state.ready_to_move,
+            "action_name": ACTION_NAMES[selected_action],
             "answered": answered,
             "final_correct": final_correct if answered else None,
             "invalid_action": invalid_action,
             "repeat_compare": repeat_compare,
             "timed_out": timed_out,
-            "steps": self._step_count,
+            "steps": self.state.steps,
         }
         return observation, float(reward), terminated, truncated, info
 
     def render(self) -> None:
-        label = "palindrome" if self._is_palindrome else "not palindrome"
+        label = "palindrome" if self.state.is_palindrome else "not palindrome"
         left_char, right_char = self._current_pointer_chars()
         print(
-            f"text='{self._current_text}' norm='{self._normalized_text}' label={label} "
-            f"L={self._left}({left_char}) R={self._right}({right_char})"
+            f"text='{self.state.text}' norm='{self.state.normalized_text}' label={label} "
+            f"L={self.state.left}({left_char}) R={self.state.right}({right_char})"
         )
+
+    def _handle_compare(self) -> tuple[float, bool, bool]:
+        reward_delta = 0.0
+        invalid_action = False
+        repeat_compare = False
+
+        if self.state.last_compared_pair == self._current_pair():
+            repeat_compare = True
+            invalid_action = True
+            reward_delta += self.repeat_compare_penalty
+        elif self._pointers_crossed():
+            self.state.has_compared = True
+            self.state.last_compared_pair = self._current_pair()
+            self.state.ready_to_move = False
+        else:
+            self.state.has_compared = True
+            self.state.last_compared_pair = self._current_pair()
+            if self._chars_mismatch():
+                self.state.mismatch_observed = True
+                self.state.ready_to_move = False
+                reward_delta += self.compare_mismatch_reward
+            else:
+                self.state.ready_to_move = True
+                reward_delta += self.compare_match_reward
+
+        return reward_delta, invalid_action, repeat_compare
+
+    def _handle_move(self) -> tuple[float, bool]:
+        valid_move = (
+            not self._pointers_crossed()
+            and not self._chars_mismatch()
+            and self.state.ready_to_move
+            and self.state.last_compared_pair == self._current_pair()
+        )
+        if not valid_move:
+            return self.move_invalid_penalty, True
+
+        self.state.left += 1
+        self.state.right -= 1
+        self.state.ready_to_move = False
+        self.state.last_compared_pair = None
+        return self.move_valid_reward, False
+
+    def _handle_answer(self, action: Action) -> tuple[float, bool, bool, bool, bool]:
+        if not self._can_attempt_answer():
+            return self.invalid_answer_penalty, False, False, False, True
+
+        predicted_palindrome = action == Action.ANSWER_PALINDROME
+        final_correct = predicted_palindrome == self.state.is_palindrome
+        reward_delta = (
+            self.final_correct_reward if final_correct else self.final_incorrect_reward
+        )
+        return reward_delta, True, True, final_correct, False
 
     def _sample_text(self) -> str:
         if self.balanced_sampling:
@@ -386,30 +413,45 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
     def _is_palindrome_text(text: str) -> bool:
         return text == text[::-1]
 
+    def _current_pair(self) -> tuple[int, int]:
+        return self.state.left, self.state.right
+
+    def _pointers_crossed(self) -> bool:
+        return self.state.left >= self.state.right
+
+    def _chars_mismatch(self) -> bool:
+        left_char, right_char = self._current_pointer_chars()
+        return left_char != right_char
+
+    def _can_attempt_answer(self) -> bool:
+        return self.state.has_compared and (
+            self.state.mismatch_observed or self._pointers_crossed()
+        )
+
     def _current_pointer_chars(self) -> tuple[str, str]:
-        if len(self._normalized_text) == 0:
+        if len(self.state.normalized_text) == 0:
             return " ", " "
-        left = max(0, min(self._left, len(self._normalized_text) - 1))
-        right = max(0, min(self._right, len(self._normalized_text) - 1))
-        return self._normalized_text[left], self._normalized_text[right]
+        left = max(0, min(self.state.left, len(self.state.normalized_text) - 1))
+        right = max(0, min(self.state.right, len(self.state.normalized_text) - 1))
+        return self.state.normalized_text[left], self.state.normalized_text[right]
 
     def _observation_text(self) -> str:
         left_char, right_char = self._current_pointer_chars()
         return (
-            f"{self._current_text}|l={self._left}|r={self._right}|"
+            f"{self.state.text}|l={self.state.left}|r={self.state.right}|"
             f"lc={left_char}|rc={right_char}"
         )
 
     def _encode_observation(self) -> dict[str, np.ndarray]:
         text = self._observation_text()
-        token_ids = [self.char_to_id.get(ch, 0) for ch in text]
-        token_ids = token_ids[: self.max_observation_len]
-        length = len(token_ids)
+        char_ids = [self.char_to_id.get(ch, 0) for ch in text]
+        char_ids = char_ids[: self.max_observation_len]
+        length = len(char_ids)
 
         padded_ids = np.zeros(self.max_observation_len, dtype=np.int32)
         attention_mask = np.zeros(self.max_observation_len, dtype=np.int32)
         if length > 0:
-            padded_ids[:length] = np.array(token_ids, dtype=np.int32)
+            padded_ids[:length] = np.array(char_ids, dtype=np.int32)
             attention_mask[:length] = 1
         return {
             "input_ids": padded_ids,
@@ -418,23 +460,22 @@ class RandomPalindromeEnv(gym.Env[dict[str, np.ndarray], int]):
         }
 
     def _valid_action_mask(self) -> np.ndarray:
-        left_char, right_char = self._current_pointer_chars()
-        mismatch = left_char != right_char
-        pointers_crossed = self._left >= self._right
-        current_pair = (self._left, self._right)
-
-        can_compare = self._last_compared_pair != current_pair
+        can_compare = self.state.last_compared_pair != self._current_pair()
         can_move = (
-            not pointers_crossed
-            and not mismatch
-            and self._ready_to_move
-            and self._last_compared_pair == current_pair
+            not self._pointers_crossed()
+            and not self._chars_mismatch()
+            and self.state.ready_to_move
+            and self.state.last_compared_pair == self._current_pair()
         )
-        # Once enough evidence exists, make terminal actions logically strict:
-        # - observed mismatch => only NOT palindrome
-        # - pointers crossed without mismatch => only palindrome
-        can_answer_pal = self._has_compared and pointers_crossed and not self._mismatch_observed
-        can_answer_not = self._has_compared and self._mismatch_observed
+        # The mask tells the policy which procedural moves are legal right now.
+        # This keeps training focused on learning the algorithm instead of
+        # wasting samples on actions that cannot make sense in the current state.
+        can_answer_pal = (
+            self.state.has_compared
+            and self._pointers_crossed()
+            and not self.state.mismatch_observed
+        )
+        can_answer_not = self.state.has_compared and self.state.mismatch_observed
         return np.array(
             [can_compare, can_move, can_answer_pal, can_answer_not],
             dtype=np.int32,

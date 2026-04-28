@@ -8,6 +8,8 @@ pinned: false
 
 # palindromon-0.116M
 
+![palindromon logo](static/palindromon-logo.png)
+
 > This is dumb and should not be taken seriously.
 >
 > This model card contains intentionally fake, unserious benchmark comparisons.

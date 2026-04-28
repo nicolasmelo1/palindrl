@@ -89,7 +89,9 @@ class TinyTransformerPolicy(nn.Module):
                 f"{self.config.max_seq_len}"
             )
 
-        positions = torch.arange(seq_len, device=input_ids.device).expand(batch_size, seq_len)
+        positions = torch.arange(seq_len, device=input_ids.device).expand(
+            batch_size, seq_len
+        )
         x = self.token_embedding(input_ids) + self.position_embedding(positions)
         x = self.dropout(x)
 
