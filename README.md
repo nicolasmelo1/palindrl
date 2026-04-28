@@ -1,3 +1,11 @@
+---
+title: palindromon-0.116M
+sdk: gradio
+sdk_version: 6.13.0
+app_file: space/app.py
+pinned: false
+---
+
 # palindromon-0.116M
 
 > This is dumb and should not be taken seriously.
