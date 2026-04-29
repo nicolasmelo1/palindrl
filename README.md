@@ -1,12 +1,12 @@
 ---
-title: palindromon-0.116M
-emoji: 🔁
-colorFrom: blue
-colorTo: green
-sdk: gradio
-sdk_version: "6.13.0"
-app_file: space/app.py
-pinned: false
+license: mit
+library_name: pytorch
+pipeline_tag: text-classification
+tags:
+  - reinforcement-learning
+  - palindrome
+  - toy-model
+  - gradio
 ---
 
 # palindromon-0.116M
@@ -22,6 +22,9 @@ pinned: false
 `palindromon-0.116M` is a tiny reinforcement-learning policy that performs one
 extremely important task: deciding whether short strings are palindromes by
 walking two pointers inward.
+
+Try the demo Space:
+[nicolasmelo/palindromon-0.116M-space](https://huggingface.co/spaces/nicolasmelo/palindromon-0.116M-space).
 
 It has **116,101 parameters**, which rounds to **0.116M** if you are feeling
 generous. It is a decoder-only transformer with a policy head, a value head, and

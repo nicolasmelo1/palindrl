@@ -8,7 +8,8 @@ from pathlib import Path
 import gradio as gr
 import torch
 
-ROOT = Path(__file__).resolve().parents[1]
+APP_DIR = Path(__file__).resolve().parent
+ROOT = APP_DIR if (APP_DIR / "checkpoints").exists() else APP_DIR.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -18,7 +19,7 @@ from palindrl.play import build_env_kwargs, prepare_model_input  # noqa: E402
 
 
 CHECKPOINT_PATH = ROOT / "checkpoints" / "policy.pt"
-LOGO_PATH = ROOT / "space" / "static" / "palindromon-logo.png"
+LOGO_PATH = APP_DIR / "static" / "palindromon-logo.png"
 
 
 def image_data_url(path: Path) -> str:
