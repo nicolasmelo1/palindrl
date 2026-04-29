@@ -1,3 +1,14 @@
+---
+title: palindromon-0.116M
+emoji: 🔁
+colorFrom: blue
+colorTo: green
+sdk: gradio
+sdk_version: "6.13.0"
+app_file: space/app.py
+pinned: false
+---
+
 # palindromon-0.116M
 
 ![palindromon logo](static/palindromon-logo.png)
