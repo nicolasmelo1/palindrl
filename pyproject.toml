@@ -12,12 +12,10 @@ dependencies = [
     "gradio>=6.13.0",
     "gymnasium>=1.2.1",
     "tensorboard>=2.20.0",
-    "tiktoken>=0.12.0",
     "torch>=2.11.0",
 ]
 
 [project.scripts]
-palindrl-tokenizer = "palindrl.tokenizer:main"
 palindrl-train = "palindrl.train:main"
 palindrl-play = "palindrl.play:main"
 

@@ -1,11 +1,3 @@
----
-title: palindromon-0.116M
-sdk: gradio
-sdk_version: 6.13.0
-app_file: space/app.py
-pinned: false
----
-
 # palindromon-0.116M
 
 ![palindromon logo](static/palindromon-logo.png)
@@ -65,7 +57,7 @@ serious language model.
 ## Original Project
 
 Tiny scaffold for a palindrome RL agent with:
-- OpenAI GPT-2 BPE tokenizer utilities
+- char-based observation encoding
 - tiny decoder-only transformer policy/value network
 - train/play CLI commands
 
@@ -75,17 +67,7 @@ Tiny scaffold for a palindrome RL agent with:
 uv sync
 ```
 
-## 1) Download OpenAI BPE tokenizer files
-
-```bash
-uv run palindrl-tokenizer download
-```
-
-This writes:
-- `assets/tokenizers/openai-gpt2/encoder.json`
-- `assets/tokenizers/openai-gpt2/vocab.bpe`
-
-## 2) Train command scaffold
+## 1) Train command scaffold
 
 ```bash
 uv run palindrl-train --steps 5000 --batch-size 2048
@@ -136,7 +118,7 @@ For char-mode training/inference, palindrome logic:
 
 So strings like `A-b,c.a` are normalized before pointer logic.
 
-## 3) Play full episode
+## 2) Play full episode
 
 ```bash
 uv run palindrl-play --checkpoint checkpoints/policy.pt --text "Ola, sou-o nicolas."
@@ -188,7 +170,6 @@ PY
 
 ## Project files
 
-- `palindrl/tokenizer.py` OpenAI BPE download + encode/decode helper
 - `palindrl/model.py` tiny decoder-only transformer with policy/value heads
 - `palindrl/train.py` PPO training loop wired to the custom environment
 - `palindrl/play.py` full-episode inference command

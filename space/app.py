@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import sys
 import unicodedata
 from pathlib import Path
@@ -17,7 +18,12 @@ from palindrl.play import build_env_kwargs, prepare_model_input  # noqa: E402
 
 
 CHECKPOINT_PATH = ROOT / "checkpoints" / "policy.pt"
-LOGO_URL = "/gradio_api/file=static/palindromon-logo.png"
+LOGO_PATH = ROOT / "space" / "static" / "palindromon-logo.png"
+
+
+def image_data_url(path: Path) -> str:
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 
 def load_model() -> tuple[TinyTransformerPolicy, TinyTransformerConfig, dict]:
@@ -97,7 +103,7 @@ with gr.Blocks(title="palindromon-0.116M") as demo:
         f"""
         <div style="display:flex; justify-content:center; margin: 16px 0;">
           <img
-            src="{LOGO_URL}"
+            src="{image_data_url(LOGO_PATH)}"
             alt="palindromon logo"
             style="max-height:220px; max-width:100%; object-fit:contain;"
           />
